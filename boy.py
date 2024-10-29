@@ -1,6 +1,6 @@
 from pico2d import load_image, get_time
 
-from state_machine import StateMachine, space_down, time_out, right_down, left_down, left_up, right_up, start_event
+from state_machine import StateMachine, space_down, time_out, right_down, left_down, left_up, right_up, start_event,a_down
 
 
 class Idle:
@@ -12,7 +12,11 @@ class Idle:
         elif left_down(e) or right_up(e) or start_event(e):
             boy.action = 3
             boy.face_dir = 1
-
+        elif time_out(e):
+            if boy.face_dir == -1:
+                boy.action = 2
+            else:
+                boy.action = 3
         boy.frame = 0
         boy.dir = 0
         #시작 시간을 기록
@@ -90,6 +94,43 @@ class Run:
         boy.image.clip_draw(boy.frame * 100, boy.action * 100, 100, 100, boy.x, boy.y)
         pass
 
+class AutoRun:
+    @staticmethod
+    def enter(boy , e):
+        if boy.face_dir == 1:
+            boy.action = 1
+            boy.dir = 1
+        else:
+            boy.action = 0
+            boy.dir = -1
+        boy.frame = 0
+        boy.start_time = get_time()
+        pass
+
+    @staticmethod
+    def exit(boy , e):
+        pass
+    @staticmethod
+    def do(boy):
+        boy.frame = (boy.frame + 1) % 8
+        boy.x += boy.dir * 10
+        if get_time() - boy.start_time > 5:
+           #이벤트를 발생
+           boy.state_machine.add_event(('TIME_OUT' , 0))
+        if boy.face_dir == 1 and boy.x >= 800:
+            boy.face_dir = -1
+            boy.action = 0
+            boy.dir = -1
+        elif boy.face_dir == -1 and boy.x <= 0:
+            boy.face_dir = 1
+            boy.action = 1
+            boy.dir = 1
+
+    @staticmethod
+    def draw(boy):
+        boy.image.clip_draw(boy.frame * 100, boy.action * 100, 100, 100, boy.x, boy.y + 30 , 200 ,200)
+        pass
+
 
 class Boy:
     def __init__(self):
@@ -102,9 +143,10 @@ class Boy:
         self.state_machine.start(Idle) #객체를 생성한게 아닌, 직접 Idle 이라는 클래스를 사용
         self.state_machine.set_transitions(
             {
-                Idle: {right_down: Run, left_down: Run, left_up: Run, right_up: Run, time_out: Sleep},
+                Idle: {right_down: Run, left_down: Run, left_up: Run, right_up: Run, a_down: AutoRun,time_out: Sleep},
                 Run: {right_down: Idle , left_down: Idle, right_up: Idle , left_up: Idle},
-                Sleep: {right_down: Run, left_down: Run, right_up: Run, left_up: Run , space_down: Idle}
+                Sleep: {right_down: Run, left_down: Run, right_up: Run, left_up: Run , space_down: Idle},
+                AutoRun: {right_down: Run , left_down: Run, right_up: Run , left_up: Run ,time_out: Idle}
             }
         )
 
